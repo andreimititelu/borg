@@ -17,8 +17,8 @@ const worker = new RSMQWorker(ENVIRONMENT.QUEUE.MIND);
 class Mind {
 	constructor(borgId) {
 		this.id = borgId;
-        this.name = ENVIRONMENT.BORG_NAME;
-        
+		this.name = ENVIRONMENT.BORG_NAME;
+
 		// The Borg Mind will only publish to the Hive
 		this.publisher = redis.createClient();
 		this.publisher.on('error', (error) => this.handleError(error));
@@ -58,17 +58,50 @@ class Mind {
 	}
 
 	think(msg, next, id) {
-        Log.info(`borg.os.mind.think`);
-        Log.info(`borg.os.mind.think.id ${id}`);
-        Log.info(`borg.os.mind.think.message ${msg}`);
+		Log.info(`borg.os.mind.think`);
+		Log.info(`borg.os.mind.think.id ${id}`);
+		Log.info(`borg.os.mind.think.message ${msg}`);
 
-        const message = JSON.parse(msg);
+		const message = JSON.parse(msg);
 
-        console.log(message);
+		switch (message.header.type) {
+            
+			case MESSAGE.TYPE.CONNECT:
+				Log.info(`borg.os.mind.think.message.type.connect ${message.header.borgID}`);
+				break;
+
+			case MESSAGE.TYPE.NOTIFICATION:
+				Log.info(`borg.os.mind.think.message.type.notification ${message.header.borgID}`);
+				break;
+
+			case MESSAGE.TYPE.EVENT:
+				Log.info(`borg.os.mind.think.message.type.event ${message.header.borgID}`);
+				break;
+
+			case MESSAGE.TYPE.COMMAND:
+				Log.info(`borg.os.mind.think.message.type.command ${message.header.borgID}`);
+				break;
+
+			case MESSAGE.TYPE.SEARCH:
+				Log.info(`borg.os.mind.think.message.type.search ${message.header.borgID}`);
+				break;
+
+			case MESSAGE.TYPE.WARNING:
+				Log.info(`borg.os.mind.think.message.type.warning ${message.header.borgID}`);
+				break;
+
+			case MESSAGE.TYPE.ALERT:
+				Log.info(`borg.os.mind.think.message.type.alert ${message.header.borgID}`);
+				break;
+
+			default:
+				Log.error(`borg.os.mind.think.message.type.unrecognized`);
+				break;
+		}
 
 		next();
-    }
-    
+	}
+
 	kill() {
 		rsmq.deleteQueue({ qname: ENVIRONMENT.QUEUE.MIND }, (err, resp) => {
 			Log.info(`borg.os.mind.kill`);
@@ -84,20 +117,18 @@ class Mind {
 			}
 		});
 	}
-    
-    handleWorkerError(err, msg) {
-        Log.error( `borg.os.work.handle.error ${err} ${msg.id}` );
-    }
 
-    handleWorkerExceeded(msg) {
-        Log.warn( `borg.os.work.handle.exceeded ${msg.id}` );
-    }
+	handleWorkerError(err, msg) {
+		Log.error(`borg.os.work.handle.error ${err} ${msg.id}`);
+	}
 
-    handleWorkerTimeout(msg) {
-        Log.warn( `borg.os.work.handle.timeout ${msg.id} ${msg.rc}` );
-    }
+	handleWorkerExceeded(msg) {
+		Log.warn(`borg.os.work.handle.exceeded ${msg.id}`);
+	}
 
-
+	handleWorkerTimeout(msg) {
+		Log.warn(`borg.os.work.handle.timeout ${msg.id} ${msg.rc}`);
+	}
 
 	listQueues() {
 		rsmq.listQueues((err, queues) => {

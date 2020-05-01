@@ -1,12 +1,14 @@
-const redis = require('redis');
-const Log = require('../lib/logger');
-
-const RedisSMQ = require('rsmq');
-const rsmq = new RedisSMQ({ host: '127.0.0.1', port: 6379, ns: 'rsmq' });
-
+// Constants
 const ENVIRONMENT = require('../lib/constants/environment');
 const MESSAGE = require('../lib/constants/message');
 
+// Redis
+const redis = require('redis');
+const Log = require('../lib/logger');
+
+// Redis SMQ
+const RedisSMQ = require('rsmq');
+const rsmq = new RedisSMQ({ host: '127.0.0.1', port: 6379, ns: 'rsmq' });
 
 class Hive {
 	constructor(borgId) {
