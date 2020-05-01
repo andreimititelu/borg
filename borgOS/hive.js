@@ -1,7 +1,12 @@
 const redis = require('redis');
 const Log = require('../lib/logger');
+
+const RedisSMQ = require('rsmq');
+const rsmq = new RedisSMQ({ host: '127.0.0.1', port: 6379, ns: 'rsmq' });
+
 const ENVIRONMENT = require('../lib/constants/environment');
 const MESSAGE = require('../lib/constants/message');
+
 
 class Hive {
 	constructor(borgId) {
@@ -45,7 +50,15 @@ class Hive {
 	handleMessage(channel, message) {
         Log.info(`borg.os.hive.handle.message ${channel} ${message}`);
 
-        // Save to local WORK queue
+        // Save to the Borg Mind        
+        rsmq.sendMessage({ qname: ENVIRONMENT.QUEUE.MIND, message: message}, (err, resp) => {
+            if (err) {
+                Log.error(`borg.os.hive.handle.message.send.error ${err}`);
+                return
+            }
+        
+            Log.info(`borg.os.hive.handle.message.send.sucess`);
+        });
      
 	}
 

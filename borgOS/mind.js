@@ -1,26 +1,34 @@
-const redis = require('redis');
-const Log = require('../lib/logger');
-
-const RedisSMQ = require('rsmq');
-const rsmq = new RedisSMQ({ host: '127.0.0.1', port: 6379, ns: 'rsmq' });
-
+// Constants
 const ENVIRONMENT = require('../lib/constants/environment');
 const MESSAGE = require('../lib/constants/message');
 
+// Redis
+const redis = require('redis');
+const Log = require('../lib/logger');
+
+// Redis SMQ
+const RedisSMQ = require('rsmq');
+const rsmq = new RedisSMQ({ host: '127.0.0.1', port: 6379, ns: 'rsmq' });
+
+// Redis SMQ Worker
+const RSMQWorker = require('rsmq-worker');
+const worker = new RSMQWorker(ENVIRONMENT.QUEUE.MIND);
+
 class Mind {
 	constructor(borgId) {
-        this.id = borgId;
+		this.id = borgId;
         this.name = ENVIRONMENT.BORG_NAME;
+        
 		// The Borg Mind will only publish to the Hive
 		this.publisher = redis.createClient();
-        this.publisher.on('error', (error) => this.handleError(error));
-        
-        this.init();
+		this.publisher.on('error', (error) => this.handleError(error));
+
+		this.init();
 	}
 
 	init() {
-        Log.info(`borg.os.mind.init`);
-       
+		Log.info(`borg.os.mind.init`);
+
 		rsmq.createQueue({ qname: ENVIRONMENT.QUEUE.MIND }, (err, resp) => {
 			if (err) {
 				Log.error(`borg.os.mind.init.error ${err}`);
@@ -29,13 +37,67 @@ class Mind {
 
 			if (resp === 1) {
 				Log.info(`borg.os.mind.init.success`);
+				Log.info(`borg.os.mind.init.worker.start`);
+				this.worker.start();
 			}
 		});
 	}
 
-	think() {
-		Log.info(`borg.os.mind.think`);
+	work() {
+		Log.info(`borg.os.mind.work`);
+
+		// The Borg Mind Worker
+		worker.on('message', (msg, next, id) => this.think(msg, next, id));
+
+		// optional error listeners
+		worker.on('error', (err, msg) => this.handleWorkerError(err, msg));
+		worker.on('exceeded', (msg) => this.handleWorkerExceeded(msg));
+		worker.on('timeout', (msg) => this.handleWorkerTimeout(msg));
+
+		worker.start();
 	}
+
+	think(msg, next, id) {
+        Log.info(`borg.os.mind.think`);
+        Log.info(`borg.os.mind.think.id ${id}`);
+        Log.info(`borg.os.mind.think.message ${msg}`);
+
+        const message = JSON.parse(msg);
+
+        console.log(message);
+
+		next();
+    }
+    
+	kill() {
+		rsmq.deleteQueue({ qname: ENVIRONMENT.QUEUE.MIND }, (err, resp) => {
+			Log.info(`borg.os.mind.kill`);
+			if (err) {
+				Log.error(`borg.os.mind.kill.error ${err}`);
+				return;
+			}
+
+			if (resp === 1) {
+				Log.info(`borg.os.mind.kill.success`);
+			} else {
+				Log.warn(`borg.os.mind.kill.not.found`);
+			}
+		});
+	}
+    
+    handleWorkerError(err, msg) {
+        Log.error( `borg.os.work.handle.error ${err} ${msg.id}` );
+    }
+
+    handleWorkerExceeded(msg) {
+        Log.warn( `borg.os.work.handle.exceeded ${msg.id}` );
+    }
+
+    handleWorkerTimeout(msg) {
+        Log.warn( `borg.os.work.handle.timeout ${msg.id} ${msg.rc}` );
+    }
+
+
 
 	listQueues() {
 		rsmq.listQueues((err, queues) => {
@@ -44,27 +106,11 @@ class Mind {
 			if (err) {
 				Log.error(`borg.os.mind.list.queues.error ${err}`);
 				return;
-			} 
+			}
 
 			Log.info(`borg.os.mind.list.queues.list ${queues}`);
 		});
-    }
-    
-    kill() {
-        rsmq.deleteQueue({ qname: ENVIRONMENT.QUEUE.MIND }, (err, resp) => {
-            if (err) {
-                console.error(err)
-                return
-            }
-        
-            if (resp === 1) {
-                console.log("Queue and all messages deleted.")
-            } else {
-                console.log("Queue not found.")
-            }
-        });
-
-    }
+	}
 
 	publish(channel, message) {
 		Log.info(`borg.os.mind.publish ${channel} ${message}`);
