@@ -14,6 +14,13 @@ const rsmq = new RedisSMQ({ host: '127.0.0.1', port: 6379, ns: 'rsmq' });
 const RSMQWorker = require('rsmq-worker');
 const worker = new RSMQWorker(ENVIRONMENT.QUEUE.MIND);
 
+// Youtube Suggestion & Search
+const suggest = require('suggestion');
+const search = require('youtube-search');
+
+// True random number generator
+const random = require('random');
+
 class Mind {
 	constructor(borgId) {
 		this.id = borgId;
@@ -37,8 +44,6 @@ class Mind {
 
 			if (resp === 1) {
 				Log.info(`borg.os.mind.init.success`);
-				Log.info(`borg.os.mind.init.worker.start`);
-				this.worker.start();
 			}
 		});
 	}
@@ -54,6 +59,7 @@ class Mind {
 		worker.on('exceeded', (msg) => this.handleWorkerExceeded(msg));
 		worker.on('timeout', (msg) => this.handleWorkerTimeout(msg));
 
+		Log.info(`borg.os.mind.work.start`);
 		worker.start();
 	}
 
@@ -65,33 +71,18 @@ class Mind {
 		const message = JSON.parse(msg);
 
 		switch (message.header.type) {
-            
 			case MESSAGE.TYPE.CONNECT:
 				Log.info(`borg.os.mind.think.message.type.connect ${message.header.borgID}`);
 				break;
 
-			case MESSAGE.TYPE.NOTIFICATION:
-				Log.info(`borg.os.mind.think.message.type.notification ${message.header.borgID}`);
-				break;
-
-			case MESSAGE.TYPE.EVENT:
-				Log.info(`borg.os.mind.think.message.type.event ${message.header.borgID}`);
-				break;
-
-			case MESSAGE.TYPE.COMMAND:
-				Log.info(`borg.os.mind.think.message.type.command ${message.header.borgID}`);
-				break;
-
 			case MESSAGE.TYPE.SEARCH:
 				Log.info(`borg.os.mind.think.message.type.search ${message.header.borgID}`);
+				this.search(message);
 				break;
 
-			case MESSAGE.TYPE.WARNING:
-				Log.info(`borg.os.mind.think.message.type.warning ${message.header.borgID}`);
-				break;
-
-			case MESSAGE.TYPE.ALERT:
-				Log.info(`borg.os.mind.think.message.type.alert ${message.header.borgID}`);
+			case MESSAGE.TYPE.LEARN:
+				Log.info(`borg.os.mind.think.message.type.learn ${message.header.borgID}`);
+				this.learn(message);
 				break;
 
 			default:
@@ -100,6 +91,51 @@ class Mind {
 		}
 
 		next();
+	}
+
+	search(message) {
+		Log.info(`borg.os.mind.search`);
+
+		console.log(message.body.length);
+
+		// Get random search suggestion from list
+
+		const suggestion = message.body[this.getRandomInt(message.body.length - 1)];
+
+		// Send new search message to the hive
+		this.createSearchMessage(suggestion);
+
+		console.log(`borg.os.mind.search.suggestion ${suggestion}`);
+	}
+
+	createSearchMessage(suggestion) {
+		suggest(suggestion, { client: 'youtube' }, (err, suggestions) => {
+			if (err) throw err;
+			// console.log(suggestions);
+
+			// create only if at least two suggestions so we can keep the search process active
+
+			if (suggestions.length == 1) {
+				suggestions = suggestions[0].split(' ');
+			}
+
+			const message = {
+				header: {
+					borgID: this.id,
+					status: MESSAGE.STATUS.ONLINE,
+					type: MESSAGE.TYPE.SEARCH,
+				},
+				body: suggestions,
+			};
+
+			console.log(message);
+
+			setTimeout(() => this.publish(ENVIRONMENT.CHANNEL.HIVE, JSON.stringify(message)), 10000);
+		});
+	}
+
+	learn(message) {
+		Log.info(`borg.os.mind.learn`);
 	}
 
 	kill() {
@@ -119,7 +155,7 @@ class Mind {
 	}
 
 	handleWorkerError(err, msg) {
-		Log.error(`borg.os.work.handle.error ${err} ${msg.id}`);
+		Log.error(`borg.os.work.handle.error ${err} ${msg.id} ${JSON.stringify(msg)}`);
 	}
 
 	handleWorkerExceeded(msg) {
@@ -146,6 +182,20 @@ class Mind {
 	publish(channel, message) {
 		Log.info(`borg.os.mind.publish ${channel} ${message}`);
 		this.publisher.publish(channel, message);
+	}
+
+	getRandomInt(limit) {
+		let temp = 0;
+		const min = random.int(0, limit);
+		const max = random.int(0, limit);
+
+		if (min >= max) {
+			temp = min;
+			min = max;
+			max = min;
+		}
+
+		return random.int(min, max);
 	}
 }
 

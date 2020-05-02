@@ -44,7 +44,7 @@ app.use('/api/v1', routes);
 
 const server = app.listen(ENVIRONMENT.HTTP_PORT, () => {
 	Log.info(`app.server.listen.port ${ENVIRONMENT.HTTP_PORT}`);
-});
+}); 
 
 /* ===================================================================================
    Unhandled rejection
