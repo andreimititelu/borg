@@ -24,7 +24,7 @@
     "express": "^4.17.1",
     "moment": "^2.25.0",
     "random": "^2.2.0",
-    "redis": "^3.0.2",
+    "redis": "^3.1.1",
     "rsmq": "^0.12.0",
     "rsmq-worker": "^0.5.2",
     "suggestion": "^2.1.2",
